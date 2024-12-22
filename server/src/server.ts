@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import mongoose from 'mongoose';
 import routes from './routes/index.js';
