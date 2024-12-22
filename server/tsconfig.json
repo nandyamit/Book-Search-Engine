@@ -2,10 +2,7 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist",
-    "types": ["node", "express", "bcrypt", "jsonwebtoken"],
-    "moduleResolution": "Node"
+    "outDir": "dist"
   },
-  "include": ["src"],
-  "typeRoots": ["./node_modules/@types", "./src/types"]
+  "include": ["src"]
 }
