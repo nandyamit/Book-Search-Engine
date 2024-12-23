@@ -1,55 +1,65 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import express, { type Request, type Response } from 'express';
+import express from 'express';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { typeDefs, resolvers } from './schemas/index.js';
 import mongoose from 'mongoose';
-import routes from './routes/index.js';
+import { authenticateToken } from './services/auth.js';  
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load env first, before any other imports
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Express middleware
+// Create Apollo Server
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+});
+
+// Start Apollo Server
+await server.start();
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// if we're in production, serve client/build as static assets
+// Apply Apollo Server middleware
+app.use('/graphql', expressMiddleware(server, {
+  context: async ({ req }) => {
+    // Get the token from the headers
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    // Add user to context if token is valid
+    try {
+      const user = token ? authenticateToken(token) : null;
+      return { user };
+    } catch (err) {
+      return {};
+    }
+  }
+}));
+
+// Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../../client/dist')));
+  
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+  });
 }
 
-// API routes
-app.use(routes);
-
-// Catch-all route for any requests that don't match the above
-app.use((_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
-});
-
-// MongoDB connection and server start
-const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/googlebooks';
-
-console.log('Connection check:', {
-  exists: !!process.env.MONGODB_URI,
-  uriValue: process.env.MONGODB_URI,
-  usingUri: uri
-});
-
-mongoose.connect(uri)
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/googlebooks')
   .then(() => {
     console.log('✅ Successfully connected to MongoDB.');
-    console.log('Connected to:', process.env.MONGODB_URI ? 'MongoDB Atlas' : 'Local MongoDB');
+    app.listen(PORT, () => {
+      console.log(`🚀 Server ready at http://localhost:${PORT}`);
+      console.log(`🎮 GraphQL Playground available at http://localhost:${PORT}/graphql`);
+    });
   })
   .catch((error) => {
     console.error('❌ MongoDB connection error:', error);
   });
-
-const db = mongoose.connection;
-db.once('open', () => {
-  app.listen(PORT, () => console.log(`🌍 Now listening on localhost:${PORT}`));
-});
